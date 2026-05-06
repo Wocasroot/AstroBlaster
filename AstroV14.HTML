@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Asteroids V6b — SFX + Audio Panel</title>
 <style>
   body { margin:0; background:#000; color:#fff; overflow:hidden; font-family:monospace; }
@@ -31,10 +32,34 @@
   #audioPanel button:hover { background:#3a3a3a; }
   #audioState { padding:2px 6px; border:1px solid #555; border-radius:999px; }
   #audioVol { width: 120px; vertical-align: middle; }
+
+
+  /* Mobile touch controls */
+  #touchControls { position: fixed; left: 0; right: 0; bottom: 8px; display: none; justify-content: space-between; padding: 0 12px; z-index: 12; pointer-events: none; }
+  #touchControls .cluster { display: flex; gap: 10px; pointer-events: auto; }
+  #touchControls button { width: 64px; height: 64px; border-radius: 50%; border:1px solid #777; background:#1a1a1acc; color:#fff; font-size:22px; font-weight:bold; }
+  #touchControls button:active { background:#333c; }
+  @media (hover:none), (pointer:coarse) {
+    #touchControls { display: flex; }
+    #audioPanel { font-size: 11px; padding: 6px 8px; max-width: calc(100vw - 20px); }
+  }
+
 </style>
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
+
+<div id="touchControls" aria-label="Mobile controls">
+  <div class="cluster">
+    <button id="btnLeft" aria-label="Turn Left">◀</button>
+    <button id="btnRight" aria-label="Turn Right">▶</button>
+    <button id="btnThrust" aria-label="Thrust">▲</button>
+  </div>
+  <div class="cluster">
+    <button id="btnFire" aria-label="Fire">●</button>
+  </div>
+</div>
+
 
 <!-- Visible Audio Panel -->
 <div id="audioPanel">
@@ -205,6 +230,30 @@ setInterval(refreshAudioState, 500);
 ["pointerdown","click","touchstart","keydown"].forEach(ev=>{
   document.addEventListener(ev, ()=>{ if(sfx.ctx && sfx.ctx.state!=="running") sfx.ctx.resume().then(refreshAudioState); }, {passive:true});
 });
+
+
+
+/* ===== Touch controls (mobile) ===== */
+const mobileTouch = matchMedia('(hover:none), (pointer:coarse)').matches;
+if (mobileTouch) {
+  const bindTouch = (id, code, opts={}) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const press = (e)=>{ e.preventDefault(); keys[code]=true; if (opts.onPress) opts.onPress(); };
+    const release = (e)=>{ e.preventDefault(); keys[code]=false; if (opts.onRelease) opts.onRelease(); };
+    ['pointerdown','touchstart'].forEach(ev=>el.addEventListener(ev, press, {passive:false}));
+    ['pointerup','pointercancel','pointerleave','touchend','touchcancel'].forEach(ev=>el.addEventListener(ev, release, {passive:false}));
+  };
+  bindTouch('btnLeft', 'ArrowLeft');
+  bindTouch('btnRight', 'ArrowRight');
+  bindTouch('btnThrust', 'ArrowUp', { onPress:()=>sfx.startThrust(), onRelease:()=>sfx.stopThrust() });
+  const fireBtn = document.getElementById('btnFire');
+  let fireTimer = null;
+  const startFire = (e)=>{ e.preventDefault(); shoot(); fireTimer = setInterval(shoot, 140); };
+  const stopFire = (e)=>{ e.preventDefault(); if (fireTimer) { clearInterval(fireTimer); fireTimer = null; } };
+  ['pointerdown','touchstart'].forEach(ev=>fireBtn.addEventListener(ev, startFire, {passive:false}));
+  ['pointerup','pointercancel','pointerleave','touchend','touchcancel'].forEach(ev=>fireBtn.addEventListener(ev, stopFire, {passive:false}));
+}
 
 /* ===== Entities & actions (gameplay same) ===== */
 function newShip(){return{
